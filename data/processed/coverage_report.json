@@ -1,0 +1,47 @@
+{
+  "total_raw_records": 12,
+  "total_processed_records": 11,
+  "total_rejected_records": 1,
+  "states_covered_count": 11,
+  "state_breakdown": {
+    "Uttar Pradesh": 1,
+    "Rajasthan": 1,
+    "Goa": 1,
+    "Kerala": 1,
+    "Maharashtra": 1,
+    "Karnataka": 1,
+    "Tamil Nadu": 1,
+    "Himachal Pradesh": 1,
+    "Uttarakhand": 1,
+    "Delhi": 1,
+    "West Bengal": 1
+  },
+  "category_breakdown": {
+    "Monument": 3,
+    "Heritage": 3,
+    "Beach": 2,
+    "Nature": 1,
+    "Adventure": 1,
+    "Spiritual": 1
+  },
+  "rejection_log": [
+    {
+      "index": 11,
+      "record": {
+        "source": "Malformed_Test_Record",
+        "source_id": "bad_001",
+        "name": "",
+        "category": "Invalid",
+        "latitude": 999.0,
+        "longitude": 77.0,
+        "state_ut": "Unknown",
+        "district_city": "Nowhere",
+        "description": "Invalid coordinates and empty name for testing validation",
+        "license": "Public Domain (Development Fixture)",
+        "version_date": "2026-10-22"
+      },
+      "reason": "Empty attraction name"
+    }
+  ],
+  "dataset_status": "Sample development dataset covering multiple Indian states/UTs"
+}

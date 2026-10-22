@@ -1,0 +1,1 @@
+- [India Travel Agent Project](memory/india-travel-agent-project.md) — project scope and architecture
