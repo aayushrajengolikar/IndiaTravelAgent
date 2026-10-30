@@ -5,6 +5,7 @@ from datetime import date
 from typing import List, Optional
 import json
 import os
+from recommender import recommend_attractions
 
 app = FastAPI(
     title="IndiaTravelAgent API",
@@ -46,6 +47,7 @@ class DestinationResponse(BaseModel):
     id: str
     source: str
     source_id: str
+    source_url: Optional[str] = "https://www.openstreetmap.org"
     name: str
     category: str
     latitude: float
@@ -119,4 +121,80 @@ def search_trip(request: TripSearchRequest):
     return {
         "message": "Trip parameters validated successfully",
         "search_parameters": request.model_dump(mode='json')
+    }
+
+class RecommendationRequest(BaseModel):
+    destination: str = Field(..., min_length=2, description="Target destination city, state, or region")
+    interests: List[str] = Field(default=[], description="List of user interests")
+    origin: Optional[str] = Field(None, description="Optional origin location to exclude")
+    limit: int = Field(5, ge=1, le=50, description="Maximum number of recommendations (1-50)")
+    min_score: float = Field(0.0, ge=0.0, le=1.0, description="Minimum relevance score threshold (0.0-1.0)")
+
+class RecommendedAttractionItem(BaseModel):
+    attraction: DestinationResponse
+    relevance_score: float = Field(..., description="Content and interest relevance score (0.0 to 1.0)")
+    reason: str = Field(..., description="Understandable reason for the recommendation")
+
+class RecommendationListResponse(BaseModel):
+    destination: str
+    total_recommendations: int
+    recommendations: List[RecommendedAttractionItem]
+
+@app.post("/api/recommendations", response_model=RecommendationListResponse)
+def get_recommendations(request: RecommendationRequest):
+    try:
+        recs = recommend_attractions(
+            destination=request.destination,
+            interests=request.interests,
+            origin=request.origin,
+            limit=request.limit,
+            min_score=request.min_score
+        )
+        return {
+            "destination": request.destination,
+            "total_recommendations": len(recs),
+            "recommendations": recs
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Recommendation engine error: {str(e)}")
+
+@app.get("/api/recommendations", response_model=RecommendationListResponse)
+def get_recommendations_get(
+    destination: str = Query(..., min_length=2, description="Target destination city, state, or region"),
+    interests: Optional[str] = Query(None, description="Comma-separated list of user interests"),
+    origin: Optional[str] = Query(None, description="Optional origin location to exclude"),
+    limit: int = Query(5, ge=1, le=50, description="Maximum number of recommendations"),
+    min_score: float = Query(0.0, ge=0.0, le=1.0, description="Minimum relevance score threshold")
+):
+    interest_list = [i.strip() for i in interests.split(",")] if interests else []
+    try:
+        recs = recommend_attractions(
+            destination=destination,
+            interests=interest_list,
+            origin=origin,
+            limit=limit,
+            min_score=min_score
+        )
+        return {
+            "destination": destination,
+            "total_recommendations": len(recs),
+            "recommendations": recs
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Recommendation engine error: {str(e)}")
+
+@app.get("/api/dataset-status")
+def get_dataset_status():
+    report_path = os.path.join(os.path.dirname(__file__), "..", "data", "processed", "coverage_report.json")
+    if os.path.exists(report_path):
+        try:
+            with open(report_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {
+        "dataset_mode": "Manually Curated Development Fixture",
+        "source_file": "attractions_sample.json",
+        "total_processed_records": len(load_destinations()),
+        "license": "Public Domain / Development Fixture"
     }

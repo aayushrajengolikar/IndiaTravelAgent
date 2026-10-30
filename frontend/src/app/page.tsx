@@ -51,6 +51,10 @@ export default function Home() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successResult, setSuccessResult] = useState<any | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [isFetchingRecs, setIsFetchingRecs] = useState<boolean>(false);
+  const [recError, setRecError] = useState<string | null>(null);
+  const [datasetInfo, setDatasetInfo] = useState<any>(null);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -59,10 +63,15 @@ export default function Home() {
       .then((res) => {
         if (res.ok) {
           setBackendStatus('connected');
+          // Fetch dataset status mode
+          return fetch(`${apiUrl}/api/dataset-status`);
         } else {
           setBackendStatus('disconnected');
+          throw new Error('Backend disconnected');
         }
       })
+      .then((res) => res.json())
+      .then((data) => setDatasetInfo(data))
       .catch(() => {
         setBackendStatus('disconnected');
       });
@@ -165,6 +174,34 @@ export default function Home() {
 
       const data = await res.json();
       setSuccessResult(data);
+
+      // Fetch recommendations for destination & interests
+      setIsFetchingRecs(true);
+      setRecError(null);
+      try {
+        const recRes = await fetch(`${apiUrl}/api/recommendations`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            destination: formState.destination,
+            origin: formState.origin,
+            interests: formState.interests,
+            limit: 6,
+          }),
+        });
+        if (!recRes.ok) {
+          throw new Error('Failed to fetch recommendations');
+        }
+        const recData = await recRes.json();
+        setRecommendations(recData.recommendations || []);
+      } catch (recErr: any) {
+        setRecError(recErr.message || 'Error fetching recommendations');
+        setRecommendations([]);
+      } finally {
+        setIsFetchingRecs(false);
+      }
     } catch (err: any) {
       setErrorMsg(err.message || 'An error occurred connecting to the backend.');
     } finally {
@@ -183,8 +220,8 @@ export default function Home() {
             </div>
             <div>
               <span className="font-bold text-xl text-slate-900 tracking-tight">IndiaTravelAgent</span>
-              <span className="hidden sm:inline-block ml-2 text-xs bg-orange-100 text-orange-800 font-medium px-2 py-0.5 rounded-full">
-                All 36 States & UTs Covered
+              <span className="hidden sm:inline-block ml-2 text-xs bg-amber-100 text-amber-800 font-medium px-2 py-0.5 rounded-full" title={datasetInfo?.license || "Development Fixture"}>
+                {datasetInfo?.dataset_mode || 'Development Fixture'}
               </span>
             </div>
           </div>
@@ -242,10 +279,72 @@ export default function Home() {
           )}
 
           {successResult && (
-            <div className="mb-6 bg-green-50 border-l-4 border-green-500 p-4 rounded-r-lg text-green-800 text-sm">
-              <span className="font-semibold">Success!</span> {successResult.message}
-              <div className="mt-2 text-xs bg-white p-3 rounded border border-green-200 font-mono overflow-x-auto">
-                {JSON.stringify(successResult.search_parameters, null, 2)}
+            <div className="mb-8 space-y-6">
+              <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded-r-lg text-green-800 text-sm">
+                <span className="font-semibold">Success!</span> {successResult.message}
+                <div className="mt-2 text-xs bg-white p-3 rounded border border-green-200 font-mono overflow-x-auto">
+                  {JSON.stringify(successResult.search_parameters, null, 2)}
+                </div>
+              </div>
+
+              {/* Recommendation Engine UI */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-2">
+                  <div>
+                    <h3 className="text-xl font-bold text-slate-900">
+                      Recommended Attractions in {formState.destination}
+                    </h3>
+                    <p className="text-xs text-slate-500">Ranked by content relevance and your selected interests</p>
+                  </div>
+                  <span className="bg-orange-100 text-orange-800 text-xs font-semibold px-3 py-1 rounded-full">
+                    AI Content-Based Engine
+                  </span>
+                </div>
+
+                {isFetchingRecs ? (
+                  <div className="py-12 text-center text-slate-500">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-3"></div>
+                    Generating ranked recommendations...
+                  </div>
+                ) : recError ? (
+                  <div className="p-4 bg-rose-50 text-rose-700 rounded-lg text-sm border border-rose-200">
+                    {recError}
+                  </div>
+                ) : recommendations.length === 0 ? (
+                  <div className="py-8 text-center text-slate-500 text-sm">
+                    No recommendations found for "{formState.destination}" with the selected interests. Try selecting different interests or destination!
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {recommendations.map((item, idx) => (
+                      <div key={item.attraction.id || idx} className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm hover:border-orange-300 transition flex flex-col justify-between">
+                        <div>
+                          <div className="flex justify-between items-start mb-2">
+                            <h4 className="font-bold text-slate-900 text-base">{item.attraction.name}</h4>
+                            <span className="bg-orange-100 text-orange-800 text-xs font-semibold px-2 py-0.5 rounded-full">
+                              {item.attraction.category}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500 mb-2">
+                            📍 {item.attraction.district_city}, {item.attraction.state_ut}
+                          </p>
+                          <p className="text-sm text-slate-700 mb-4 line-clamp-3">
+                            {item.attraction.description}
+                          </p>
+                        </div>
+                        <div className="border-t border-slate-100 pt-3 mt-auto">
+                          <div className="flex justify-between items-center text-xs text-slate-600 mb-1">
+                            <span className="font-medium">Relevance Score:</span>
+                            <span className="font-bold text-orange-600">{(item.relevance_score * 100).toFixed(0)}%</span>
+                          </div>
+                          <p className="text-xs text-slate-500 italic bg-slate-50 p-2 rounded border border-slate-100">
+                            💡 {item.reason}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}

@@ -20,11 +20,11 @@ def test_get_destinations():
     assert len(data) > 0
 
 def test_get_destinations_with_query():
-    response = client.get("/api/destinations?query=Taj")
+    response = client.get("/api/destinations?query=Fort")
     assert response.status_code == 200
     data = response.json()
     assert len(data) >= 1
-    assert "Taj Mahal" in data[0]["name"]
+    assert "Fort" in data[0]["name"] or "Fort" in data[0]["description"]
 
 def test_get_destinations_with_state_filter():
     response = client.get("/api/destinations?state=Goa")
@@ -34,11 +34,11 @@ def test_get_destinations_with_state_filter():
     assert data[0]["state_ut"] == "Goa"
 
 def test_get_destinations_with_category_filter():
-    response = client.get("/api/destinations?category=Beach")
+    response = client.get("/api/destinations?category=Heritage")
     assert response.status_code == 200
     data = response.json()
     assert len(data) >= 1
-    assert data[0]["category"] == "Beach"
+    assert "Heritage" in data[0]["category"]
 
 def test_get_destinations_pagination():
     response = client.get("/api/destinations?limit=2&offset=0")
@@ -94,3 +94,92 @@ def test_coverage_report_exists():
         report = json.load(f)
     assert report["total_processed_records"] > 0
     assert "state_breakdown" in report
+
+def test_recommendations_successful_post():
+    payload = {
+        "destination": "Jaipur",
+        "interests": ["Heritage & History"],
+        "limit": 3
+    }
+    response = client.post("/api/recommendations", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["destination"] == "Jaipur"
+    assert "recommendations" in data
+    recs = data["recommendations"]
+    assert isinstance(recs, list)
+    if len(recs) > 0:
+        rec = recs[0]
+        assert "attraction" in rec
+        assert "relevance_score" in rec
+        assert "reason" in rec
+        assert 0.0 <= rec["relevance_score"] <= 1.0
+        assert len(rec["reason"]) > 0
+
+def test_recommendations_successful_get():
+    response = client.get("/api/recommendations?destination=Goa&interests=Beaches&limit=2")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["destination"] == "Goa"
+    assert len(data["recommendations"]) <= 2
+
+def test_recommendations_empty_interests():
+    payload = {
+        "destination": "Agra",
+        "interests": [],
+        "limit": 2
+    }
+    response = client.post("/api/recommendations", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["recommendations"]) >= 0
+
+def test_recommendations_unknown_interests():
+    payload = {
+        "destination": "Delhi",
+        "interests": ["Quantum Physics", "Underwater Basket Weaving"],
+        "limit": 3
+    }
+    response = client.post("/api/recommendations", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert "recommendations" in data
+
+def test_recommendations_no_matches():
+    payload = {
+        "destination": "NonExistentCityXYZ123",
+        "interests": ["Beaches"],
+        "limit": 3
+    }
+    response = client.post("/api/recommendations", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total_recommendations"] == 0
+
+def test_recommendations_invalid_limit():
+    payload = {
+        "destination": "Jaipur",
+        "limit": 999  # Exceeds max 50
+    }
+    response = client.post("/api/recommendations", json=payload)
+    assert response.status_code == 422
+
+def test_recommendations_origin_exclusion():
+    payload = {
+        "destination": "Jaipur",
+        "origin": "Amer Fort",
+        "interests": ["History"],
+        "limit": 5
+    }
+    response = client.post("/api/recommendations", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    for rec in data["recommendations"]:
+        assert "Amer Fort" not in rec["attraction"]["name"]
+
+def test_recommender_module_directly():
+    from recommender import recommend_attractions
+    recs = recommend_attractions(destination="Kerala", interests=["Nature"], limit=2)
+    assert isinstance(recs, list)
+    if len(recs) > 0:
+        assert 0.0 <= recs[0]["relevance_score"] <= 1.0

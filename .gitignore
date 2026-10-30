@@ -1,45 +1,56 @@
 # Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-.venv/
-venv/
-ENV/
+*.py[cod]
+*$py.class
+*.so
+.Python
 env/
+.venv/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Pytest
 .pytest_cache/
-.mypy_cache/
 .coverage
 htmlcov/
+.tox/
+.cache/
 
-# Node.js & Next.js
-node_modules/
-.next/
-out/
-build/
-dist/
+# Node / Next.js
+frontend/.next/
+frontend/out/
+frontend/node_modules/
+frontend/.env.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
 
-# Environment files
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# Large data extracts (keep small intentional fixtures)
+data/raw/*.osm
+data/raw/*.pbf
+data/raw/*.osm.json
+data/processed/*.tmp
 
-# Datasets & Model Artifacts
-data/raw/*
-!data/raw/attractions_sample.json
-data/processed/*
-!data/processed/destinations_processed.json
-!data/processed/coverage_report.json
-
-*.pkl
-*.joblib
-*.cat
-*.h5
-*.onnx
-
-# OS generated files
-Thumbs.db
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+*.swo
 .DS_Store
-*.log
+Thumbs.db
